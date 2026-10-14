@@ -7,6 +7,7 @@ import {
   UsersRound, WalletCards, X,
 } from 'lucide-react'
 import { api, type Claim, type ClaimStatus, type Opportunity, type Practice, type Product } from './api'
+import type { AuthUser } from './auth/auth'
 
 type Page = 'Overview' | 'Claims' | 'Practices' | 'Products & sales'
 
@@ -15,7 +16,7 @@ const shortDate = (value: string) => new Intl.DateTimeFormat('en-US', { month: '
 const todayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date()).toUpperCase()
 const statusLabel: Record<ClaimStatus, string> = { submitted: 'Submitted', in_review: 'In review', follow_up: 'Follow-up', denied: 'Denied', paid: 'Paid' }
 
-function App() {
+function App({ user, onLogout }: { user?: AuthUser; onLogout?: () => Promise<void> }) {
   const previewView = new URLSearchParams(window.location.search).get('view')
   const [page, setPage] = useState<Page>(previewView === 'claims' || previewView === 'claim-detail' ? 'Claims' : 'Overview')
   const [filter, setFilter] = useState('all')
@@ -52,13 +53,16 @@ function App() {
   const practices = practicesQuery.data ?? []
   const products = productsQuery.data ?? []
   const opportunities = opportunitiesQuery.data ?? []
+  const practiceName = user?.practices[0]?.name ?? 'Northstar Dental'
+  const operatorName = user?.full_name || 'Demo operator'
+  const initials = operatorName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || 'MF'
   const topClaims = useMemo(() => [...claims].sort((a, b) => b.age_days - a.age_days).slice(0, 5), [claims])
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand"><div className="brand-mark"><Stethoscope size={18} strokeWidth={2.4} /></div><span>molarflow</span><span className="brand-dot">.</span></div>
-        <div className="workspace-switch"><div className="workspace-avatar">N</div><div className="workspace-copy"><strong>Northstar Dental</strong><span>Operations workspace</span></div><ChevronDown size={15} /></div>
+        <div className="workspace-switch"><div className="workspace-avatar">{practiceName[0]}</div><div className="workspace-copy"><strong>{practiceName}</strong><span>Clinic stakeholder workspace</span></div><ChevronDown size={15} /></div>
         <div className="nav-label">WORKSPACE</div>
         <nav className="main-nav" aria-label="Main navigation">
           <NavItem icon={<LayoutDashboard size={17} />} label="Overview" active={page === 'Overview'} onClick={() => setPage('Overview')} />
@@ -74,19 +78,19 @@ function App() {
         </nav>
         <div className="sidebar-bottom">
           <div className="support-card"><div className="support-icon"><LifeBuoy size={17} /></div><strong>Need a hand?</strong><span>Visit the help center</span><ArrowRight size={15} className="support-arrow" /></div>
-          <button className="profile-button"><div className="profile-avatar">SK</div><span className="profile-copy"><strong>Shaqib Khan</strong><small>Workspace admin</small></span><MoreHorizontal size={19} /></button>
+          <button className="profile-button" onClick={onLogout} disabled={!onLogout}><div className="profile-avatar">{initials}</div><span className="profile-copy"><strong>{operatorName}</strong><small>{user ? 'Clinic stakeholder · Sign out' : 'Demo workspace'}</small></span><MoreHorizontal size={19} /></button>
         </div>
       </aside>
 
       <main className="main-content">
-        <header className="topbar"><div className="breadcrumbs"><span>Northstar Dental</span><span className="crumb-slash">/</span><strong>{page}</strong></div><div className="topbar-actions"><div className="searchbox top-search"><Search size={15} /><input aria-label="Search workspace" placeholder="Search anything..." onChange={(event) => setSearch(event.target.value)} /><kbd><Command size={10} /> K</kbd></div><button className="icon-button" aria-label="Help"><CircleHelp size={18} /></button><button className="icon-button notification-button" aria-label="Notifications"><Bell size={18} /><i /></button><div className="top-avatar">SK</div></div></header>
+        <header className="topbar"><div className="breadcrumbs"><span>{practiceName}</span><span className="crumb-slash">/</span><strong>{page}</strong></div><div className="topbar-actions"><div className="searchbox top-search"><Search size={15} /><input aria-label="Search workspace" placeholder="Search anything..." onChange={(event) => setSearch(event.target.value)} /><kbd><Command size={10} /> K</kbd></div><button className="icon-button" aria-label="Help"><CircleHelp size={18} /></button><button className="icon-button notification-button" aria-label="Notifications"><Bell size={18} /><i /></button><div className="top-avatar">{initials}</div></div></header>
         <div className="page-wrap">
           {page === 'Overview' && <OverviewPage overview={overviewQuery.data} claims={topClaims} practices={practices} opportunities={opportunities} loading={overviewQuery.isLoading} error={overviewQuery.isError || claimsQuery.isError} onOpenClaim={(claim) => { setSelected(claim); setPage('Claims') }} onFollowUp={(claim) => followUpMutation.mutate(claim)} />}
           {page === 'Claims' && <ClaimsPage claims={claims} loading={claimsQuery.isLoading} error={claimsQuery.isError} filter={filter} search={search} selected={selected} mutationPending={followUpMutation.isPending} onFilter={setFilter} onSearch={setSearch} onSelect={setSelected} onFollowUp={(claim) => followUpMutation.mutate(claim)} />}
           {page === 'Practices' && <PracticesPage practices={practices} loading={practicesQuery.isLoading} />}
           {page === 'Products & sales' && <SalesPage products={products} opportunities={opportunities} loading={productsQuery.isLoading || opportunitiesQuery.isLoading} />}
         </div>
-        <footer className="page-footer"><span><ShieldCheck size={13} /> Demo workspace · synthetic records only</span><span>© 2026 MolarFlow</span></footer>
+        <footer className="page-footer"><span><ShieldCheck size={13} />{user ? 'Protected stakeholder workspace · clinic-scoped records' : 'Demo workspace · synthetic records only'}</span><span>© 2026 MolarFlow</span></footer>
       </main>
     </div>
   )
@@ -176,12 +180,12 @@ function PracticesPage({ practices, loading }: { practices: Practice[]; loading:
 
 function SalesPage({ products, opportunities, loading }: { products: Product[]; opportunities: Opportunity[]; loading: boolean }) {
   const pipeline = opportunities.reduce((sum, row) => sum + Number(row.value), 0)
-  return <><div className="page-heading"><div><div className="eyebrow">COMMERCIAL OPERATIONS</div><h1>Products & sales</h1><p>Grow practice value with products tied to real RCM needs.</p></div><button className="primary-button"><Plus size={16} /> New opportunity</button></div><div className="account-summary sales-summary"><div><span>Open opportunities</span><strong>{loading ? '—' : opportunities.length}</strong></div><div><span>Pipeline value / month</span><strong>{loading ? '—' : money(pipeline)}</strong></div><div><span>Products live</span><strong>{loading ? '—' : products.length}</strong></div><div><span>Product accounts</span><strong>{loading ? '—' : products.reduce((sum, product) => sum + product.active_accounts, 0)}</strong></div></div><div className="sales-layout"><section className="panel catalog-panel"><div className="panel-heading"><div><h2>Product catalog</h2><p>Solutions for practice operations.</p></div><button className="more-button" aria-label="Product options"><MoreHorizontal size={18} /></button></div><div className="product-list">{products.map((product, index) => <ProductCard key={product.id} product={product} index={index} />)}</div></section><section className="panel opportunities-panel"><div className="panel-heading"><div><h2>Opportunities</h2><p>Next steps across the pipeline.</p></div><button className="secondary-button"><Filter size={14} /> Filter</button></div><div className="opportunity-table">{opportunities.map((opportunity) => <div className="opportunity-card" key={opportunity.id}><div className="opportunity-card-top"><span className={`stage-pill stage-${opportunity.stage}`}>{opportunity.stage}</span><strong>{money(opportunity.value)}<small>/mo</small></strong></div><h3>{opportunity.product_name}</h3><p>{opportunity.practice_name}</p><div className="opportunity-note">{opportunity.note}</div><div className="opportunity-meta"><span>Owner · {opportunity.owner}</span><span>Due {shortDate(opportunity.due_date)}</span></div></div>)}</div></section></div></>
+  return <><div className="page-heading"><div><div className="eyebrow">COMMERCIAL OPERATIONS</div><h1>Products & sales</h1><p>Grow practice value with products tied to real RCM needs.</p></div><button className="primary-button"><Plus size={16} /> New opportunity</button></div><div className="account-summary sales-summary"><div><span>Open opportunities</span><strong>{loading ? '—' : opportunities.length}</strong></div><div><span>Pipeline value / month</span><strong>{loading ? '—' : money(pipeline)}</strong></div><div><span>Products live</span><strong>{loading ? '—' : products.length}</strong></div><div><span>Product accounts</span><strong>{loading ? '—' : products.every((product) => product.active_accounts !== undefined) ? products.reduce((sum, product) => sum + (product.active_accounts ?? 0), 0) : '—'}</strong></div></div><div className="sales-layout"><section className="panel catalog-panel"><div className="panel-heading"><div><h2>Product catalog</h2><p>Solutions for practice operations.</p></div><button className="more-button" aria-label="Product options"><MoreHorizontal size={18} /></button></div><div className="product-list">{products.map((product, index) => <ProductCard key={product.id} product={product} index={index} />)}</div></section><section className="panel opportunities-panel"><div className="panel-heading"><div><h2>Opportunities</h2><p>Next steps across the pipeline.</p></div><button className="secondary-button"><Filter size={14} /> Filter</button></div><div className="opportunity-table">{opportunities.map((opportunity) => <div className="opportunity-card" key={opportunity.id}><div className="opportunity-card-top"><span className={`stage-pill stage-${opportunity.stage}`}>{opportunity.stage}</span><strong>{money(opportunity.value)}<small>/mo</small></strong></div><h3>{opportunity.product_name}</h3><p>{opportunity.practice_name}</p><div className="opportunity-note">{opportunity.note}</div><div className="opportunity-meta"><span>Owner · {opportunity.owner}</span><span>Due {shortDate(opportunity.due_date)}</span></div></div>)}</div></section></div></>
 }
 
 function ProductCard({ product, index }: { product: Product; index: number }) {
   const Icon = [Activity, ShieldCheck, WalletCards][index % 3]
-  return <article className="product-card"><div className={`product-icon product-icon-${index % 3}`}><Icon size={19} /></div><div className="product-card-copy"><div className="product-card-title"><h3>{product.name}</h3><span>{product.category}</span></div><p>{product.description}</p><div className="product-card-foot"><span><strong>{product.active_accounts}</strong> practices live</span><strong>{money(product.monthly_price)}<small>/mo</small></strong></div></div></article>
+  return <article className="product-card"><div className={`product-icon product-icon-${index % 3}`}><Icon size={19} /></div><div className="product-card-copy"><div className="product-card-title"><h3>{product.name}</h3><span>{product.category}</span></div><p>{product.description}</p><div className="product-card-foot">{product.active_accounts !== undefined && <span><strong>{product.active_accounts}</strong> practices live</span>}<strong>{money(product.monthly_price)}<small>/mo</small></strong></div></div></article>
 }
 
 function TableLoading({ columns = 6 }: { columns?: number }) { return <>{Array.from({ length: 4 }).map((_, row) => <tr key={row} className="skeleton-row"><td colSpan={columns}><span /></td></tr>)}</> }

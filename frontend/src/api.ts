@@ -19,7 +19,7 @@ export type Practice = {
   id: number; name: string; region: string; locations: number; stage: 'live' | 'onboarding' | 'at_risk'
   mrr: string; products: string[]; next_step: string; claim_count: number
 }
-export type Product = { id: number; name: string; category: string; description: string; monthly_price: string; active_accounts: number }
+export type Product = { id: number; name: string; category: string; description: string; monthly_price: string; active_accounts?: number }
 export type Opportunity = {
   id: number; practice: number; practice_name: string; product: number; product_name: string
   stage: string; value: string; owner: string; due_date: string; note: string
@@ -32,6 +32,7 @@ export type Overview = {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/${path}`, {
     ...init,
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...init?.headers },
   })
   if (!response.ok) {
@@ -43,7 +44,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 // GitHub Pages has no Django process. In that build, use the same fictional
 // seed records in memory so visitors can explore the interface without a server.
-const demoMode = import.meta.env.VITE_DEMO_MODE === 'true'
+export const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
 const today = new Date()
 const isoDate = (offset: number) => {
   const date = new Date(today)
@@ -120,16 +121,16 @@ const demoApi = {
 }
 
 export const api = {
-  overview: () => demoMode ? demoApi.overview() : request<Overview>('overview/'),
+  overview: () => isDemoMode ? demoApi.overview() : request<Overview>('overview/'),
   claims: (status: string, search: string) => {
-    if (demoMode) return demoApi.claims(status, search)
+    if (isDemoMode) return demoApi.claims(status, search)
     const params = new URLSearchParams()
     if (status !== 'all') params.set('status', status)
     if (search.trim()) params.set('search', search.trim())
     return request<Claim[]>(`claims/?${params.toString()}`)
   },
-  updateClaim: (id: number, update: Partial<Pick<Claim, 'status' | 'follow_up_note'>>) => demoMode ? demoApi.updateClaim(id, update) : request<Claim>(`claims/${id}/`, { method: 'PATCH', body: JSON.stringify(update) }),
-  practices: () => demoMode ? demoApi.practices() : request<Practice[]>('practices/'),
-  products: () => demoMode ? demoApi.products() : request<Product[]>('products/'),
-  opportunities: () => demoMode ? demoApi.opportunities() : request<Opportunity[]>('opportunities/'),
+  updateClaim: (id: number, update: Partial<Pick<Claim, 'status' | 'follow_up_note'>>) => isDemoMode ? demoApi.updateClaim(id, update) : request<Claim>(`claims/${id}/`, { method: 'PATCH', body: JSON.stringify(update) }),
+  practices: () => isDemoMode ? demoApi.practices() : request<Practice[]>('practices/'),
+  products: () => isDemoMode ? demoApi.products() : request<Product[]>('products/'),
+  opportunities: () => isDemoMode ? demoApi.opportunities() : request<Opportunity[]>('opportunities/'),
 }

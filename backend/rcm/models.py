@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 class Practice(models.Model):
@@ -15,6 +16,35 @@ class Practice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         return self.name
+
+class StakeholderProfile(models.Model):
+    """Non-privileged identity details for a dental-clinic stakeholder."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="stakeholder_profile")
+    full_name = models.CharField(max_length=160)
+    normalized_email = models.EmailField(unique=True)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.full_name or self.user.get_username()
+
+class PracticeMembership(models.Model):
+    """Connect a stakeholder to only the practice records they may access."""
+    class Role(models.TextChoices):
+        STAKEHOLDER = "stakeholder", "Stakeholder"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="practice_memberships")
+    practice = models.ForeignKey(Practice, on_delete=models.CASCADE, related_name="memberships")
+    role = models.CharField(max_length=24, choices=Role.choices, default=Role.STAKEHOLDER)
+    is_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "practice"], name="unique_stakeholder_practice")]
+
+    def __str__(self):
+        return "{} — {}".format(self.user.get_username(), self.practice.name)
 
 class Claim(models.Model):
     class Status(models.TextChoices):

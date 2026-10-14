@@ -7,7 +7,9 @@ class ClaimSerializer(serializers.ModelSerializer):
     class Meta:
         model = Claim
         fields = ["id", "reference", "practice", "practice_name", "payer", "procedure", "submitted_at", "billed_amount", "expected_amount", "patient_responsibility", "status", "denial_reason", "follow_up_note", "age_days", "updated_at"]
-        read_only_fields = ["id", "practice_name", "age_days", "updated_at"]
+        # A stakeholder may update claim status and notes, never move a claim
+        # between clinic tenants through a writable foreign key.
+        read_only_fields = ["id", "practice", "practice_name", "age_days", "updated_at"]
     def get_age_days(self, claim):
         from django.utils import timezone
         return max((timezone.localdate() - claim.submitted_at).days, 0)
@@ -22,6 +24,15 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = ["id", "name", "category", "description", "monthly_price", "active_accounts"]
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        if not request or not request.user.is_staff:
+            # Account-adoption totals are internal customer data, not part of
+            # the public product catalog visible to clinic stakeholders.
+            fields.pop("active_accounts", None)
+        return fields
 
 class OpportunitySerializer(serializers.ModelSerializer):
     practice_name = serializers.CharField(source="practice.name", read_only=True)

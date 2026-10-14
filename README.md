@@ -45,7 +45,7 @@ MolarFlow uses fictional records for demonstration. It does not submit claims, c
 
 **[Open the MolarFlow interactive demo](https://skeeb32.github.io/molarflow-dental-rcm/)** · [Browse the source](https://github.com/Skeeb32/molarflow-dental-rcm)
 
-The public showcase runs as a static GitHub Pages build with the repository’s fictional seed records. Search, filters, navigation, and the follow-up interaction work in your browser; demo changes are in-memory and reset on refresh. To see the persistent Django API version, follow the local setup below.
+The public showcase runs as a static GitHub Pages build with fictional seed records. Search, filters, navigation, and the follow-up interaction work in your browser; demo changes are in-memory and reset on refresh. The static site does not host Django authentication. To explore the authenticated Django-backed app, follow the local setup below.
 
 ## Visual tour
 
@@ -188,18 +188,15 @@ source .venv/bin/activate
 .venv\Scripts\Activate.ps1
 ```
 
-Install the API dependencies, apply migrations, load the demo records, and run Django:
+Install the API dependencies, apply the schema, and run Django:
 
 ```bash
 python -m pip install -r requirements.txt
 python manage.py migrate
-python manage.py seed_demo
 python manage.py runserver
 ```
 
-The API is available at [http://localhost:8000/api/](http://localhost:8000/api/).
-
-> **Seed command note:** `seed_demo` clears the demo-domain tables for practices, claims, products, and opportunities before recreating the sample dataset. Run it against a local demo database only.
+The API is available at [http://localhost:8000/api/](http://localhost:8000/api/). Start the React app below, choose **Create a clinic account**, and verify the email link printed in the Django terminal. The new account starts with an empty practice workspace; the GitHub Pages showcase remains the way to explore the bundled fictional dashboard data.
 
 ### 3. Install and start the React app
 
@@ -211,7 +208,11 @@ npm ci
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). Vite proxies `/api` requests to Django at `http://127.0.0.1:8000`.
+Open [http://localhost:5173](http://localhost:5173). Vite proxies `/api` and `/accounts` requests to Django at `http://127.0.0.1:8000`.
+
+### Authentication and provider setup
+
+Local sign-up, email verification, password reset, username recovery, secure sessions, and clinic-scoped API access use Django. In local development, Django prints email links to the server terminal. Google, Apple, and Microsoft buttons appear only after their OAuth credentials and callback URLs have been configured. Follow the [authentication setup guide](docs/authentication-setup.md) before deploying; GitHub Pages is a static demo and does not provide live accounts or email.
 
 ### Build the frontend
 
@@ -232,22 +233,17 @@ The production bundle is written to `frontend/dist/`. GitHub Actions builds and 
 - Select a claim to inspect amounts, age, denial context, and the latest follow-up note.
 - Queue follow-up to update the claim status through the API.
 
-Example API requests:
+The data API requires a verified, signed-in stakeholder session. Use the browser app to sign in before exploring the browsable API at the endpoints below; unauthenticated requests are denied.
 
-```bash
+```http
 # Overview metrics
-curl http://localhost:8000/api/overview/
+GET http://localhost:8000/api/overview/
 
 # Claims in follow-up
-curl "http://localhost:8000/api/claims/?status=follow_up"
+GET http://localhost:8000/api/claims/?status=follow_up
 
 # Search claims by payer, procedure, practice, or reference
-curl "http://localhost:8000/api/claims/?search=Delta"
-
-# Update one claim (replace 1 with an ID returned by the API)
-curl -X PATCH http://localhost:8000/api/claims/1/ \
-  -H "Content-Type: application/json" \
-  -d '{"status":"follow_up","follow_up_note":"Call payer about missing narrative"}'
+GET http://localhost:8000/api/claims/?search=Delta
 ```
 
 ### Explore customer and sales data
@@ -272,19 +268,21 @@ Django REST Framework's browsable API is available at the same local API URLs.
 
 ## Configuration and project layout
 
-No environment file is required for the local demo. Django currently uses SQLite and a development-only secret in `backend/config/settings.py`; replace the secret and configure production settings before deployment. CORS is configured for the local Vite origins.
+Local debug settings use SQLite, a development-only fallback secret, and Django's console-email backend. Production requires a unique `DJANGO_SECRET_KEY`, HTTPS, allowed hosts/origins, a real email service, and a same-site frontend/backend deployment. Optional provider sign-ins require provider credentials. See [`backend/.env.example`](backend/.env.example) and the [authentication setup guide](docs/authentication-setup.md). CORS is configured for the local Vite origins.
 
 ```text
 backend/
 ├── config/                 # Django settings, URLs, ASGI and WSGI entry points
 └── rcm/
     ├── management/         # seed_demo management command
-    ├── migrations/         # initial schema
-    ├── models.py           # Practice, Claim, Product, Opportunity
+    ├── migrations/         # domain and stakeholder-auth schemas
+    ├── auth_views.py       # registration, verification, sessions, recovery
+    ├── models.py           # practices, claims, products, memberships, profiles
     ├── serializers.py      # API representations
     └── views.py            # viewsets and overview aggregate
 frontend/
 └── src/
+    ├── auth/               # login, signup, recovery, verification UI
     ├── api.ts              # typed API client and response types
     ├── App.tsx             # navigation, pages, queries, mutation
     ├── main.tsx            # React root and QueryClient configuration
@@ -300,12 +298,12 @@ cd frontend
 npm run build
 ```
 
-The repository does not yet include an automated test suite. GitHub Actions builds and deploys the static showcase when frontend files change. For a local smoke check, start both servers and verify:
+The Django authentication suite covers verification, login gating, recovery response privacy, and practice-level claim isolation. Run it with `cd backend && python manage.py test rcm`. The frontend build checks TypeScript before bundling. GitHub Actions builds and deploys the static showcase when frontend files change. For a local smoke check, start both servers and verify:
 
-1. The overview loads metrics and demo records.
-2. Claim status tabs and search update the queue.
-3. A follow-up mutation persists after a refresh.
-4. Practice and product/sales pages display their seeded data.
+1. Registration creates a pending stakeholder and prints a verification link in Django output.
+2. Email verification activates the account and creates a session.
+3. The authenticated API returns records only for that account's active practice memberships.
+4. The public Pages demo loads fictional records without a backend.
 
 ## Roadmap
 
@@ -314,14 +312,17 @@ The repository does not yet include an automated test suite. GitHub Actions buil
 - [x] React + TypeScript dashboard
 - [x] TanStack Query resource queries and optimistic claim follow-up
 - [x] Django REST API and initial SQLite schema
+- [x] Django session authentication, email verification/recovery, and clinic membership scoping
+- [x] React login/sign-up, recovery, verification, and optional provider sign-in entry points
 - [x] Seeded fictional practices, claims, products, and opportunities
 - [x] Search/filter workflows and responsive practice, claims, and sales views
 
 ### Planned
 
-- [ ] Authentication, roles, and practice-level tenant isolation
+- [ ] Expanded role administration and invitation-based practice membership management
 - [x] GitHub Actions build and GitHub Pages deployment for the interactive showcase
-- [ ] Automated API and UI workflow tests
+- [x] Automated Django auth and tenant-scope tests
+- [ ] Broader API and UI workflow tests
 - [ ] CI checks for migrations and tests
 - [ ] Write workflows for practice onboarding and sales opportunities
 - [ ] Production database and deployment configuration
@@ -349,14 +350,14 @@ MolarFlow demonstrates an end-to-end feature slice across a typed React UI and a
 - Implementing API-backed search, filters, aggregates, and seeded demo data.
 - Documenting scope and limitations clearly: this is an API-backed portfolio MVP, not production billing software.
 
-The project does **not** claim live payer integrations, HIPAA readiness, production scale, or performance benchmarks. The GitHub Pages showcase uses in-memory synthetic data; the persistent Django API runs locally.
+The project does **not** claim live payer integrations, HIPAA readiness, production scale, or performance benchmarks. The GitHub Pages showcase uses in-memory synthetic data; the authenticated Django API currently runs locally and needs production hosting, email delivery, and optional OAuth credentials for a public authenticated deployment.
 
 ## Project metrics
 
 These are repository/demo facts, not production usage metrics:
 
-- **4** domain models: Practice, Claim, Product, Opportunity
-- **6** documented API routes
+- **6** domain models, including stakeholder profiles and practice memberships
+- **6** documented data API routes, plus dedicated authentication routes
 - **5 / 10 / 3 / 4** seeded practices / claims / products / opportunities
 - **1** claim update workflow with optimistic client feedback
 

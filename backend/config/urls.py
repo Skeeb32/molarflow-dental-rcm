@@ -8,4 +8,10 @@ router.register("claims", ClaimViewSet, basename="claim")
 router.register("practices", PracticeViewSet, basename="practice")
 router.register("opportunities", OpportunityViewSet, basename="opportunity")
 router.register("products", ProductViewSet, basename="product")
-urlpatterns = [path("admin/", admin.site.urls), path("api/", include(router.urls)), path("api/overview/", overview, name="overview")]
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("accounts/", include("allauth.urls")),
+    path("api/auth/", include("rcm.auth_urls")),
+    path("api/", include(router.urls)),
+    path("api/overview/", overview, name="overview"),
+]
