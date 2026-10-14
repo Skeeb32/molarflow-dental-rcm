@@ -41,6 +41,40 @@ MolarFlow uses fictional records for demonstration. It does not submit claims, c
 
 ---
 
+## Try the live demo
+
+**[Open the MolarFlow interactive demo](https://skeeb32.github.io/molarflow-dental-rcm/)** · [Browse the source](https://github.com/Skeeb32/molarflow-dental-rcm)
+
+The public showcase runs as a static GitHub Pages build with the repository’s fictional seed records. Search, filters, navigation, and the follow-up interaction work in your browser; demo changes are in-memory and reset on refresh. To see the persistent Django API version, follow the local setup below.
+
+## Visual tour
+
+### Operations dashboard
+
+![MolarFlow operations dashboard with claim aging, payer statuses, practice health, and sales pipeline](docs/media/dashboard.png)
+
+### Claim queue and detail view
+
+The screenshots and short walkthrough below are captured from the running demo. Open the [claims queue](https://skeeb32.github.io/molarflow-dental-rcm/?view=claims) or a [sample claim detail](https://skeeb32.github.io/molarflow-dental-rcm/?view=claim-detail) directly.
+
+<details>
+<summary>View the claims queue screenshot</summary>
+
+![MolarFlow claims queue with all ten fictional sample claims](docs/media/claims.png)
+
+</details>
+
+<details>
+<summary>View the selected claim detail screenshot</summary>
+
+![MolarFlow claim detail drawer showing payer, billed amount, expected reimbursement, and follow-up note](docs/media/claim-detail.png)
+
+</details>
+
+### Animated walkthrough
+
+![MolarFlow walkthrough moving from the dashboard to the claims queue and selected claim detail](docs/media/claim-follow-up.gif)
+
 ## What you can explore
 
 | Revenue-cycle operations | Practice and product growth |
@@ -54,7 +88,7 @@ MolarFlow uses fictional records for demonstration. It does not submit claims, c
 
 ## Visual architecture
 
-The repository does not currently include a hosted demo or checked-in application screenshots. These diagrams describe the implemented data path and claim follow-up interaction.
+The public GitHub Pages showcase is a client-side build for quick exploration. The diagrams below describe the Django-backed local application data path and claim follow-up interaction.
 
 ### Request and data flow
 
@@ -187,7 +221,7 @@ npm run build
 npm run preview
 ```
 
-The production bundle is written to `frontend/dist/`. No hosting or deployment workflow is configured in this repository yet.
+The production bundle is written to `frontend/dist/`. GitHub Actions builds and deploys the client-side showcase to [GitHub Pages](https://skeeb32.github.io/molarflow-dental-rcm/).
 
 ## Usage
 
@@ -266,7 +300,7 @@ cd frontend
 npm run build
 ```
 
-The repository does not yet include an automated test suite or CI workflow. For a local smoke check, start both servers and verify:
+The repository does not yet include an automated test suite. GitHub Actions builds and deploys the static showcase when frontend files change. For a local smoke check, start both servers and verify:
 
 1. The overview loads metrics and demo records.
 2. Claim status tabs and search update the queue.
@@ -286,8 +320,9 @@ The repository does not yet include an automated test suite or CI workflow. For 
 ### Planned
 
 - [ ] Authentication, roles, and practice-level tenant isolation
+- [x] GitHub Actions build and GitHub Pages deployment for the interactive showcase
 - [ ] Automated API and UI workflow tests
-- [ ] CI checks for builds, migrations, and tests
+- [ ] CI checks for migrations and tests
 - [ ] Write workflows for practice onboarding and sales opportunities
 - [ ] Production database and deployment configuration
 - [ ] Real clearinghouse integrations, only after security, privacy, and workflow review
@@ -314,7 +349,7 @@ MolarFlow demonstrates an end-to-end feature slice across a typed React UI and a
 - Implementing API-backed search, filters, aggregates, and seeded demo data.
 - Documenting scope and limitations clearly: this is an API-backed portfolio MVP, not production billing software.
 
-The project does **not** claim live payer integrations, HIPAA readiness, production scale, performance benchmarks, or deployed hosting.
+The project does **not** claim live payer integrations, HIPAA readiness, production scale, or performance benchmarks. The GitHub Pages showcase uses in-memory synthetic data; the persistent Django API runs locally.
 
 ## Project metrics
 

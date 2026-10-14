@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Activity, ArrowRight, BadgeDollarSign, Bell, BriefcaseBusiness,
@@ -16,7 +16,8 @@ const todayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'l
 const statusLabel: Record<ClaimStatus, string> = { submitted: 'Submitted', in_review: 'In review', follow_up: 'Follow-up', denied: 'Denied', paid: 'Paid' }
 
 function App() {
-  const [page, setPage] = useState<Page>('Overview')
+  const previewView = new URLSearchParams(window.location.search).get('view')
+  const [page, setPage] = useState<Page>(previewView === 'claims' || previewView === 'claim-detail' ? 'Claims' : 'Overview')
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Claim | null>(null)
@@ -26,6 +27,11 @@ function App() {
   const practicesQuery = useQuery({ queryKey: ['practices'], queryFn: api.practices })
   const productsQuery = useQuery({ queryKey: ['products'], queryFn: api.products })
   const opportunitiesQuery = useQuery({ queryKey: ['opportunities'], queryFn: api.opportunities })
+  useEffect(() => {
+    if (previewView === 'claim-detail' && claimsQuery.data?.length && !selected) {
+      setSelected(claimsQuery.data.find((claim) => claim.id === 9) ?? claimsQuery.data[0])
+    }
+  }, [previewView, claimsQuery.data, selected])
   const followUpMutation = useMutation({
     mutationFn: (claim: Claim) => api.updateClaim(claim.id, { status: 'follow_up', follow_up_note: 'Follow-up queued by operations team' }),
     onSuccess: (updated) => setSelected((current) => current?.id === updated.id ? updated : current),
