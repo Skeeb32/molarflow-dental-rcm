@@ -38,7 +38,7 @@ def overview(request):
     claims = Claim.objects.all()
     today = timezone.localdate()
     overdue = claims.exclude(status__in=[Claim.Status.PAID, Claim.Status.DENIED]).filter(submitted_at__lte=today - timedelta(days=30))
-    expected = claims.exclude(status=Claim.Status.PAID).aggregate(total=Sum("expected_amount"))["total"] or Decimal("0")
+    expected = claims.exclude(status__in=[Claim.Status.PAID, Claim.Status.DENIED]).aggregate(total=Sum("expected_amount"))["total"] or Decimal("0")
     pipeline = Opportunity.objects.aggregate(total=Sum("value"))["total"] or Decimal("0")
     status_counts = {row["status"]: row["total"] for row in claims.values("status").annotate(total=Count("id"))}
     return Response({

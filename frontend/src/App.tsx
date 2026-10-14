@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Activity, ArrowRight, ArrowUpRight, BadgeDollarSign, Bell, BriefcaseBusiness,
+  Activity, ArrowRight, BadgeDollarSign, Bell, BriefcaseBusiness,
   Check, ChevronDown, CircleHelp, ClipboardList, Command, CreditCard, Filter, LayoutDashboard,
   LifeBuoy, MoreHorizontal, Plus, Search, Settings2, ShieldCheck, Sparkles, Stethoscope,
   UsersRound, WalletCards, X,
@@ -12,6 +12,7 @@ type Page = 'Overview' | 'Claims' | 'Practices' | 'Products & sales'
 
 const money = (amount: string | number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(amount))
 const shortDate = (value: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(`${value}T12:00:00`))
+const todayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date()).toUpperCase()
 const statusLabel: Record<ClaimStatus, string> = { submitted: 'Submitted', in_review: 'In review', follow_up: 'Follow-up', denied: 'Denied', paid: 'Paid' }
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
   const opportunitiesQuery = useQuery({ queryKey: ['opportunities'], queryFn: api.opportunities })
   const followUpMutation = useMutation({
     mutationFn: (claim: Claim) => api.updateClaim(claim.id, { status: 'follow_up', follow_up_note: 'Follow-up queued by operations team' }),
+    onSuccess: (updated) => setSelected((current) => current?.id === updated.id ? updated : current),
     onMutate: async (claim) => {
       await queryClient.cancelQueries({ queryKey: ['claims'] })
       const previous = queryClient.getQueriesData<Claim[]>({ queryKey: ['claims'] })
@@ -73,7 +75,7 @@ function App() {
       <main className="main-content">
         <header className="topbar"><div className="breadcrumbs"><span>Northstar Dental</span><span className="crumb-slash">/</span><strong>{page}</strong></div><div className="topbar-actions"><div className="searchbox top-search"><Search size={15} /><input aria-label="Search workspace" placeholder="Search anything..." onChange={(event) => setSearch(event.target.value)} /><kbd><Command size={10} /> K</kbd></div><button className="icon-button" aria-label="Help"><CircleHelp size={18} /></button><button className="icon-button notification-button" aria-label="Notifications"><Bell size={18} /><i /></button><div className="top-avatar">SK</div></div></header>
         <div className="page-wrap">
-          {page === 'Overview' && <OverviewPage overview={overviewQuery.data} claims={topClaims} practices={practices} opportunities={opportunities} loading={overviewQuery.isLoading} error={overviewQuery.isError} onOpenClaim={(claim) => { setSelected(claim); setPage('Claims') }} onFollowUp={(claim) => followUpMutation.mutate(claim)} />}
+          {page === 'Overview' && <OverviewPage overview={overviewQuery.data} claims={topClaims} practices={practices} opportunities={opportunities} loading={overviewQuery.isLoading} error={overviewQuery.isError || claimsQuery.isError} onOpenClaim={(claim) => { setSelected(claim); setPage('Claims') }} onFollowUp={(claim) => followUpMutation.mutate(claim)} />}
           {page === 'Claims' && <ClaimsPage claims={claims} loading={claimsQuery.isLoading} error={claimsQuery.isError} filter={filter} search={search} selected={selected} mutationPending={followUpMutation.isPending} onFilter={setFilter} onSearch={setSearch} onSelect={setSelected} onFollowUp={(claim) => followUpMutation.mutate(claim)} />}
           {page === 'Practices' && <PracticesPage practices={practices} loading={practicesQuery.isLoading} />}
           {page === 'Products & sales' && <SalesPage products={products} opportunities={opportunities} loading={productsQuery.isLoading || opportunitiesQuery.isLoading} />}
@@ -97,18 +99,18 @@ function OverviewPage({ overview, claims, practices, opportunities, loading, err
   const chartStatuses = [['follow_up', 'Follow-up'], ['in_review', 'In review'], ['submitted', 'Submitted'], ['denied', 'Denied'], ['paid', 'Paid']] as const
   const maxStatusCount = Math.max(1, ...chartStatuses.map(([key]) => overview?.status_counts?.[key] ?? 0))
   return <>
-    <div className="page-heading"><div><div className="eyebrow">TUESDAY, OCTOBER 14, 2026 <span className="live-pill"><i /> LIVE OVERVIEW</span></div><h1>Good morning, Shaqib <span className="wave">✳</span></h1><p>Here’s what’s happening across your revenue cycle today.</p></div><button className="primary-button"><Plus size={16} /> Create report</button></div>
+    <div className="page-heading"><div><div className="eyebrow">{todayLabel} <span className="live-pill"><i /> LIVE OVERVIEW</span></div><h1>Good morning, Shaqib <span className="wave">✳</span></h1><p>Here’s what’s happening across your revenue cycle today.</p></div><button className="primary-button" onClick={() => claims[0] && onOpenClaim(claims[0])}><ClipboardList size={15} /> Review claims</button></div>
     {error && <ErrorBanner />}
     <section className="metric-grid" aria-label="Revenue cycle summary">
-      <MetricCard title="Open claims" value={loading ? '—' : String(overview?.open_claims ?? 0)} detail="Across all payers" trend="8.2%" direction="up" icon={<ClipboardList size={17} />} accent="sage" />
-      <MetricCard title="Expected reimbursement" value={loading ? '—' : money(overview?.expected_reimbursement ?? 0)} detail="Pending payer response" trend="4.6%" direction="up" icon={<WalletCards size={17} />} accent="cream" />
-      <MetricCard title="Aging over 30 days" value={loading ? '—' : String(overview?.over_30_days ?? 0)} detail="Needs a follow-up" trend="2.1%" direction="down" icon={<Activity size={17} />} accent="peach" />
-      <MetricCard title="Denials to work" value={loading ? '—' : String(overview?.denied_claims ?? 0)} detail="Across active practices" trend="1.8%" direction="down" icon={<BadgeDollarSign size={17} />} accent="blue" />
+      <MetricCard title="Open claims" value={loading ? '—' : String(overview?.open_claims ?? 0)} detail="Across all payers" icon={<ClipboardList size={17} />} accent="sage" />
+      <MetricCard title="Expected reimbursement" value={loading ? '—' : money(overview?.expected_reimbursement ?? 0)} detail="Open claims only" icon={<WalletCards size={17} />} accent="cream" />
+      <MetricCard title="Aging over 30 days" value={loading ? '—' : String(overview?.over_30_days ?? 0)} detail="Needs a follow-up" icon={<Activity size={17} />} accent="peach" />
+      <MetricCard title="Denials to work" value={loading ? '—' : String(overview?.denied_claims ?? 0)} detail="Across active practices" icon={<BadgeDollarSign size={17} />} accent="blue" />
     </section>
     <section className="content-grid overview-grid">
       <div className="panel claims-panel"><div className="panel-heading"><div><h2>Claims needing attention</h2><p>Start with the oldest items in your queue.</p></div><button className="text-button" onClick={() => onOpenClaim(claims[0])}>View all claims <ArrowRight size={14} /></button></div>
         <div className="table-wrap"><table><thead><tr><th>CLAIM / PRACTICE</th><th>PAYER</th><th>AGE</th><th>EXPECTED</th><th>STATUS</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
-          {loading ? <TableLoading /> : claims.length ? claims.map((claim) => <ClaimRow key={claim.id} claim={claim} onSelect={() => onOpenClaim(claim)} onFollowUp={() => onFollowUp(claim)} />) : <tr><td colSpan={6}><EmptyState /></td></tr>}
+          {loading ? <TableLoading /> : error ? <tr><td colSpan={6}><ErrorBanner /></td></tr> : claims.length ? claims.map((claim) => <ClaimRow key={claim.id} claim={claim} onSelect={() => onOpenClaim(claim)} onFollowUp={() => onFollowUp(claim)} />) : <tr><td colSpan={6}><EmptyState /></td></tr>}
         </tbody></table></div>
         <button className="mobile-view-all" onClick={() => onOpenClaim(claims[0])}>Open claims queue <ArrowRight size={14} /></button>
       </div>
@@ -118,12 +120,12 @@ function OverviewPage({ overview, claims, practices, opportunities, loading, err
       </aside>
     </section>
     <section className="bottom-grid"><div className="panel practice-panel"><div className="panel-heading"><div><h2>Practice health</h2><p>Accounts that may need a closer look.</p></div><span className="small-count">{attention.length} need attention</span></div><div className="practice-list">{practices.slice(0, 4).map((practice) => <PracticeRow key={practice.id} practice={practice} />)}</div></div>
-      <div className="panel pipeline-panel"><div className="panel-heading"><div><h2>Growth pipeline</h2><p>Product conversations in motion.</p></div><button className="more-button" aria-label="More pipeline options"><MoreHorizontal size={18} /></button></div><div className="pipeline-total">{money(overview?.pipeline_value ?? 0)}<span>weighted monthly value</span></div><div className="opportunity-list">{opportunities.slice(0, 3).map((opportunity) => <OpportunityRow key={opportunity.id} opportunity={opportunity} />)}</div></div></section>
+      <div className="panel pipeline-panel"><div className="panel-heading"><div><h2>Growth pipeline</h2><p>Product conversations in motion.</p></div><button className="more-button" aria-label="More pipeline options"><MoreHorizontal size={18} /></button></div><div className="pipeline-total">{money(overview?.pipeline_value ?? 0)}<span>potential monthly value</span></div><div className="opportunity-list">{opportunities.slice(0, 3).map((opportunity) => <OpportunityRow key={opportunity.id} opportunity={opportunity} />)}</div></div></section>
   </>
 }
 
-function MetricCard({ title, value, detail, trend, direction, icon, accent }: { title: string; value: string; detail: string; trend: string; direction: 'up' | 'down'; icon: React.ReactNode; accent: string }) {
-  return <article className="metric-card"><div className={`metric-icon ${accent}`}>{icon}</div><div className="metric-title">{title}</div><div className="metric-value">{value}</div><div className="metric-foot"><span>{detail}</span><span className={`trend ${direction}`}><ArrowUpRight size={12} className={direction === 'down' ? 'down-arrow' : ''} /> {trend}</span></div></article>
+function MetricCard({ title, value, detail, icon, accent }: { title: string; value: string; detail: string; icon: React.ReactNode; accent: string }) {
+  return <article className="metric-card"><div className={`metric-icon ${accent}`}>{icon}</div><div className="metric-title">{title}</div><div className="metric-value">{value}</div><div className="metric-foot"><span>{detail}</span></div></article>
 }
 
 function ClaimRow({ claim, onSelect, onFollowUp }: { claim: Claim; onSelect: () => void; onFollowUp: () => void }) {
